@@ -11,6 +11,7 @@ lib/
 dist/
 build/
 *.tgz
+*.podspec
 
 # React Native & Expo
 .expo/
