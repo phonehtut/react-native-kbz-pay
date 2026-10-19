@@ -1,0 +1,70 @@
+{
+  "name": "react-native-kbz-pay",
+  "version": "1.0.0",
+  "description": "Developer-friendly KBZ Pay mobile payment integration for React Native and Expo (iOS & Android)",
+  "main": "lib/commonjs/index.js",
+  "module": "lib/module/index.js",
+  "types": "lib/typescript/index.d.ts",
+  "react-native": "src/index.ts",
+  "source": "src/index.ts",
+  "author": {
+    "name": "Phone Htut Khaung",
+    "email": "phonehtutkhaung.dev@gmail.com",
+    "url": "https://yamm.newway-solutions.tech"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phonehtut/react-native-kbz-pay.git"
+  },
+  "homepage": "https://github.com/phonehtut/react-native-kbz-pay#readme",
+  "bugs": {
+    "url": "https://github.com/phonehtut/react-native-kbz-pay/issues"
+  },
+  "files": [
+    "src",
+    "lib",
+    "android",
+    "ios",
+    "plugin",
+    "app.plugin.js",
+    "react-native-kbz-pay.podspec",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.build.esm.json",
+    "clean": "rm -rf lib",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run clean && npm run build"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "react-native",
+    "expo",
+    "kbz",
+    "kbzpay",
+    "kpay",
+    "myanmar",
+    "payment",
+    "fintech"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*"
+  },
+  "peerDependenciesMeta": {
+    "@expo/config-plugins": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@expo/config-plugins": "^9.0.0",
+    "@types/react": "^19.0.0",
+    "react": "19.3.0",
+    "react-native": "0.88.0",
+    "typescript": "^5.3.3"
+  }
+}

@@ -1,0 +1,67 @@
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.2.1'
+    }
+}
+
+apply plugin: 'com.android.library'
+
+def safeExtGet(prop, fallback) {
+    rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
+}
+
+def getKbzEnvironment() {
+    if (project.hasProperty('kbzpay_environment')) {
+        return project.property('kbzpay_environment').toString().trim().toLowerCase()
+    }
+    if (rootProject.ext.has('kbzpayEnvironment')) {
+        return rootProject.ext.get('kbzpayEnvironment').toString().trim().toLowerCase()
+    }
+    return 'prod'
+}
+
+android {
+    compileSdkVersion safeExtGet('compileSdkVersion', 34)
+    namespace "com.kbzpay"
+
+    defaultConfig {
+        minSdkVersion safeExtGet('minSdkVersion', 21)
+        targetSdkVersion safeExtGet('targetSdkVersion', 34)
+    }
+
+    lintOptions {
+        abortOnError false
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+    flatDir {
+        dirs 'libs'
+    }
+}
+
+def kbzEnv = getKbzEnvironment()
+def aarPath = (kbzEnv == 'uat') ? "libs/uat/kbzsdk_1.1.0.aar" : "libs/prod/kbzsdk_1.1.0.aar"
+
+dependencies {
+    // React Native
+    //noinspection GradleDynamicVersion
+    implementation 'com.facebook.react:react-android:+'
+
+    // KBZ Pay Native SDK (dynamically resolved to UAT or PROD)
+    implementation(files(aarPath))
+
+    // AndroidX
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+}

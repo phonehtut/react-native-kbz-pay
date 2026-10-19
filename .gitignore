@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing & Coverage
+coverage/
+
+# Production build artifacts & archives
+lib/
+dist/
+build/
+*.tgz
+
+# React Native & Expo
+.expo/
+.expo-shared/
+
+# Android build artifacts & cache
+.gradle/
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/*.iml
+*.apk
+*.aab
+
+# iOS build artifacts & pods
+ios/build/
+ios/Pods/
+ios/Podfile.lock
+ios/*.xcworkspace
+*.ipa
+
+# Logs & caches
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm/
+.eslintcache
+.turbo/
+
+# OS metadata
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs & Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# Environment & Secret files
+.env
+.env*.local
+*.pem
+*.key

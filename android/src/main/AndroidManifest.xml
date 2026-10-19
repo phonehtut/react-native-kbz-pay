@@ -1,0 +1,17 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.kbzpay">
+
+    <!-- Android 11+ package visibility for checking if KBZPay app is installed -->
+    <queries>
+        <package android:name="com.kbzbank.kpaycustomer" />
+        <package android:name="com.kbzbank.kpaycustomer.uat" />
+    </queries>
+
+    <application>
+        <activity
+            android:name="com.kbzbank.payment.sdk.callback.CallbackResultActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+    </application>
+</manifest>
