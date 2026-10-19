@@ -39,7 +39,7 @@ interface NativeKbzPayModuleType {
 }
 
 const LINKING_ERROR =
-  `The package 'react-native-kbz-pay' doesn't seem to be linked. Make sure: \n\n` +
+  `The package '@phonehtut/react-native-kbz-pay' doesn't seem to be linked. Make sure: \n\n` +
   Platform.select({ ios: "- You have run 'pod install'\n", default: '' }) +
   '- You rebuilt the app after installing the package\n' +
   '- You are not using Expo Go (use Expo Prebuild or development client)\n';

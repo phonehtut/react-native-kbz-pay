@@ -1,5 +1,5 @@
 {
-  "name": "react-native-kbz-pay",
+  "name": "@phonehtut/react-native-kbz-pay",
   "version": "1.0.0",
   "description": "Developer-friendly KBZ Pay mobile payment integration for React Native and Expo (iOS & Android)",
   "main": "lib/commonjs/index.js",

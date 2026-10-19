@@ -1,6 +1,6 @@
-# react-native-kbz-pay
+# @phonehtut/react-native-kbz-pay
 
-[![npm version](https://img.shields.io/badge/npm-v1.0.0-blue.svg)](https://www.npmjs.com/)
+[![npm version](https://img.shields.io/npm/v/@phonehtut/react-native-kbz-pay.svg)](https://www.npmjs.com/package/@phonehtut/react-native-kbz-pay)
 [![platform](https://img.shields.io/badge/platform-ios%20%7C%20android-lightgrey.svg)](https://reactnative.dev)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![docs](https://img.shields.io/badge/docs-KBZPay%20Official-blue.svg)](https://wap.kbzpay.com/pgw/uat/api/#/en/docs/Distributor%20BuyGoods%20InApp/scenes-distributor-in-app-en)
@@ -42,7 +42,7 @@ Pass `"environment": "uat"` or `"environment": "prod"` in your `app.json` plugin
   "expo": {
     "plugins": [
       [
-        "react-native-kbz-pay",
+        "@phonehtut/react-native-kbz-pay",
         {
           "environment": "uat"
         }
@@ -67,13 +67,13 @@ kbzpay_environment=uat
 
 ```bash
 # Using npm
-npm install react-native-kbz-pay
+npm install @phonehtut/react-native-kbz-pay
 
 # Using yarn
-yarn add react-native-kbz-pay
+yarn add @phonehtut/react-native-kbz-pay
 
 # Using bun
-bun add react-native-kbz-pay
+bun add @phonehtut/react-native-kbz-pay
 ```
 
 ### Expo Projects
@@ -85,7 +85,7 @@ Add the plugin to your `app.json`:
   "expo": {
     "plugins": [
       [
-        "react-native-kbz-pay",
+        "@phonehtut/react-native-kbz-pay",
         {
           "environment": "uat"
         }
@@ -138,7 +138,7 @@ React Native autolinking will automatically link `KBZPayPackage` and merge the c
 You can check for specific environments or either:
 
 ```typescript
-import { isKbzPayInstalled } from 'react-native-kbz-pay';
+import { isKbzPayInstalled } from '@phonehtut/react-native-kbz-pay';
 
 // Check if UAT Sandbox app is installed
 const hasUatApp = await isKbzPayInstalled('uat');
@@ -161,7 +161,7 @@ In mobile payments, relying purely on native deep links/activity callbacks can f
 You can supply the `verifyPayment` callback in `startKbzPay`. When the user returns to your app (`AppState` becomes `active`), the package automatically polls your backend to verify that the transaction was confirmed via KBZ Pay's server webhook:
 
 ```typescript
-import { startKbzPay, type KbzPayResult } from 'react-native-kbz-pay';
+import { startKbzPay, type KbzPayResult } from '@phonehtut/react-native-kbz-pay';
 
 try {
   // 1. Get prepay orderInfo and sign from your backend
@@ -210,7 +210,7 @@ try {
 You can also listen to payment events via event emitter:
 
 ```typescript
-import { addKbzPayListener } from 'react-native-kbz-pay';
+import { addKbzPayListener } from '@phonehtut/react-native-kbz-pay';
 
 const subscription = addKbzPayListener((result) => {
   console.log('Payment result event:', result);

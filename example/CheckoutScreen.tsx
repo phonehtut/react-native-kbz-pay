@@ -14,7 +14,7 @@ import {
   startKbzPay,
   isKbzPayInstalled,
   type KbzPayResult,
-} from 'react-native-kbz-pay';
+} from '@phonehtut/react-native-kbz-pay';
 
 export default function CheckoutScreen() {
   const [isAppInstalled, setIsAppInstalled] = useState<boolean | null>(null);
