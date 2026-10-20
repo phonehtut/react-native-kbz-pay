@@ -51,16 +51,58 @@ repositories {
     }
 }
 
-def kbzEnv = getKbzEnvironment()
-def aarPath = (kbzEnv == 'uat') ? "libs/uat/kbzsdk_1.1.0.aar" : "libs/prod/kbzsdk_1.1.0.aar"
+def getAarFile() {
+    def kbzEnv = getKbzEnvironment()
+
+    // 1. Check custom path property if set
+    if (project.hasProperty('kbzpay_custom_aar')) {
+        def customFile = file(project.property('kbzpay_custom_aar').toString().trim())
+        if (customFile.exists()) return customFile
+    }
+
+    // 2. Environment specific path (libs/uat/kbzsdk_1.1.0.aar or libs/prod/kbzsdk_1.1.0.aar)
+    def envFile = file((kbzEnv == 'uat') ? "libs/uat/kbzsdk_1.1.0.aar" : "libs/prod/kbzsdk_1.1.0.aar")
+    if (envFile.exists()) return envFile
+
+    // 3. Fallback to libs/kbzsdk_1.1.0.aar
+    def defaultFile = file("libs/kbzsdk_1.1.0.aar")
+    if (defaultFile.exists()) return defaultFile
+
+    // 4. Any .aar inside libs/
+    def libsDir = file("libs")
+    if (libsDir.exists()) {
+        def aars = libsDir.listFiles(new FilenameFilter() {
+            boolean accept(File dir, String name) {
+                return name.endsWith('.aar')
+            }
+        })
+        if (aars != null && aars.length > 0) {
+            return aars[0]
+        }
+    }
+    return null
+}
+
+def resolvedAar = getAarFile()
+if (resolvedAar == null) {
+    throw new GradleException(
+        "\n========================================================================\n" +
+        "[react-native-kbz-pay] ❌ KBZ Pay Android SDK (.aar) was not found!\n" +
+        "Please download the official SDK from KBZ Pay portal:\n" +
+        "  https://wap.kbzpay.com/pgw/uat/api/#/en/docs/Distributor%20BuyGoods%20InApp/in-app-download-en\n" +
+        "and run the setup command in your project:\n" +
+        "  npx react-native-kbz-pay setup-sdk <path-to-sdk-download>\n" +
+        "========================================================================\n"
+    )
+}
 
 dependencies {
     // React Native
     //noinspection GradleDynamicVersion
     implementation 'com.facebook.react:react-android:+'
 
-    // KBZ Pay Native SDK (dynamically resolved to UAT or PROD)
-    implementation(files(aarPath))
+    // KBZ Pay Native SDK (dynamically resolved to UAT, PROD, or custom path)
+    implementation(files(resolvedAar))
 
     // AndroidX
     implementation 'androidx.appcompat:appcompat:1.6.1'

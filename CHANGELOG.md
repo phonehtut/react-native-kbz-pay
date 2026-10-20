@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.2.0] - 2026-10-20
+
+### 🔒 Security & Architecture Upgrade
+- **Zero-Trust Pure Wrapper Architecture**: Removed pre-compiled proprietary binary blobs (`.aar`, `.xcframework`) from the npm distribution package and git tracking for total supply-chain security and license compliance.
+- **Automated SDK Setup Utility (`bin/cli.js`)**:
+  - Added `npx react-native-kbz-pay setup-sdk <path-to-sdk-download>` CLI command.
+  - Automatically handles Android `.aar` linking.
+  - Automatically merges official KBZ iOS frameworks (`framework/prod` + `framework/simulator`) into a clean `KBZPayAPPPay.xcframework` using `xcodebuild`.
+  - Added `npx react-native-kbz-pay verify-sdk` command to inspect local binary SHA-256 hashes against official bank releases.
+- **Fail-Fast Informative Build Errors**: If native SDKs have not been set up, Gradle and CocoaPods emit clean, step-by-step guidance linking to the official KBZ Pay portal and setup command.
+- **Custom AAR Path Support**: Supported `kbzpay_custom_aar` property in Gradle for custom enterprise local paths.
+
+---
+
 ## [1.1.0] - 2026-10-20
 
 ### 🚀 Added

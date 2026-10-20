@@ -1,6 +1,0 @@
-framework module KBZPayAPPPay {
-  umbrella header "KBZPayAPPPay.h"
-
-  export *
-  module * { export * }
-}

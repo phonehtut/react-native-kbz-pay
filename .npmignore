@@ -1,0 +1,13 @@
+# Exclude proprietary native binary SDKs from npm distribution
+android/libs/*.aar
+android/libs/**/*.aar
+ios/KBZPayAPPPay.xcframework/
+
+# Dev & Git metadata
+.git/
+.github/
+.idea/
+.vscode/
+example/
+*.tgz
+*.log

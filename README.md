@@ -15,7 +15,8 @@ Designed to be completely **backend-agnostic** with full **UAT Sandbox** and **P
 
 ## 🌟 Highlights
 
-- 📦 **Zero Native Config Hassle**: Pre-bundled with official KBZ Pay Android SDKs (`.aar`) and iOS SDK (`.xcframework`).
+- 🔒 **Zero-Trust & Pure Wrapper Architecture**: No proprietary bank binaries (`.aar`, `.xcframework`) are bundled inside the npm package. You download the official SDK directly from KBZ Bank and link with a single automated CLI command.
+- ⚡ **1-Command Automated SDK Setup**: `npx react-native-kbz-pay setup-sdk` handles Android AAR linking and converts KBZ iOS frameworks into a modern `.xcframework` seamlessly.
 - 🔄 **Full UAT & Production Support**: Easily switch between UAT Sandbox testing and Live Production with a single config flag.
 - 🚀 **Expo Ready**: Includes official Expo Config Plugin (`app.plugin.js`) for seamless `npx expo prebuild` support.
 - 📱 **Dynamic iOS URL Scheme**: Automatically detects your app's return URL scheme from `Info.plist` (no hardcoding needed).
@@ -75,6 +76,34 @@ yarn add @phonehtut/react-native-kbz-pay
 # Using bun
 bun add @phonehtut/react-native-kbz-pay
 ```
+
+### ⚡ Official SDK Setup (1-Minute Setup)
+
+For security, supply-chain safety, and licensing compliance, this package follows a **zero-trust wrapper approach**: official bank binaries are not redistributed in the npm package. You download the official SDKs directly from the bank portal and configure them in one command:
+
+1. **Download the official SDKs** from the KBZ Bank Developer Portal:
+   - 👉 [Official KBZPay SDK Download Center](https://wap.kbzpay.com/pgw/uat/api/#/en/docs/Distributor%20BuyGoods%20InApp/in-app-download-en)
+   - **Android**: `kbzsdk_1.1.0.aar`
+   - **iOS**: `KBZPay_sdk_ios_v1.3.0.zip`
+
+2. **Run the automated setup utility**:
+   ```bash
+   # Point to your downloaded folder or unzipped directory (e.g. ~/Downloads/1.3):
+   npx react-native-kbz-pay setup-sdk ~/Downloads/1.3
+
+   # Or point to a folder containing both Android .aar and iOS files:
+   npx react-native-kbz-pay setup-sdk ~/Downloads/my-kbz-sdk-folder
+   ```
+
+   **What the setup utility does automatically:**
+   - Detects and links Android `.aar` files to `android/libs/`.
+   - On iOS, KBZ distributes separate device (`framework/prod`) and simulator (`framework/simulator`) frameworks. The utility automatically merges them into a clean, modern `KBZPayAPPPay.xcframework` using `xcodebuild` so it builds on both real devices and Apple Silicon/Intel simulators without manual effort.
+   - Computes SHA-256 hashes so you can verify SDK integrity immediately.
+
+3. **Verify anytime**:
+   ```bash
+   npx react-native-kbz-pay verify-sdk
+   ```
 
 ### Expo Projects
 
@@ -565,6 +594,36 @@ Resets any stuck pending transaction state in the native bridge.
 
 ### `parseKbzUrl(urlString: string): KbzPayResult | null`
 Utility to manually parse a deep link callback URL.
+
+---
+
+## 🔐 Security & SDK Integrity Verification
+
+We prioritize supply-chain security and transparency. The npm package contains **zero pre-compiled proprietary binary blobs**. All developers link directly from official KBZ Bank releases.
+
+### Official KBZ Pay Release Checksums (SHA-256)
+
+You can verify that the binaries you downloaded from the [Official KBZPay Portal](https://wap.kbzpay.com/pgw/uat/api/#/en/docs/Distributor%20BuyGoods%20InApp/in-app-download-en) match known official bank releases:
+
+| Platform | Target | Official File / Component | SHA-256 Checksum |
+| :--- | :--- | :--- | :--- |
+| **Android** | Production | `kbzsdk_1.1.0.aar` | `d2ae7189d6bd635f208c5f850cb73ae0098a0fef61200b33810668b96967bb6a` |
+| **Android** | UAT Sandbox | `kbzsdk_1.1.0.aar` (UAT) | `b83fc469509d5dd97b992cfe0a4aa820b029144f906d439e10b37d3a78370ebf` |
+| **iOS** | Device (`arm64`, `armv7`) | `framework/prod/.../KBZPayAPPPay` | `94437a1db1a7d65d37d7ab47aeca535e9f20e1083c0ca7b1f04b6c32b533394c` |
+| **iOS** | Simulator (`arm64`, `x86_64`) | `framework/simulator/.../KBZPayAPPPay` | `f91d19b3daa14fb72980b6509a57d7ed0ccc8459024cd266aa583ab753ade147` |
+
+### Manual Verification Command
+To verify any file locally on macOS / Linux:
+```bash
+# Android
+shasum -a 256 path/to/kbzsdk_1.1.0.aar
+
+# iOS Device binary
+shasum -a 256 path/to/1.3/framework/prod/KBZPayAPPPay.framework/KBZPayAPPPay
+
+# Or run the built-in validator
+npx react-native-kbz-pay verify-sdk
+```
 
 ---
 
