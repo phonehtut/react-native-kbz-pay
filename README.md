@@ -133,79 +133,150 @@ React Native autolinking will automatically link `KBZPayPackage` and merge the c
 
 ## 💻 Client Usage
 
-### 1. Check if KBZ Pay App is Installed
+### 1. Modern React Hook (`useKbzPay`) — Recommended
 
-You can check for specific environments or either:
+The easiest and most idiomatic way in React Native / Expo:
 
-```typescript
-import { isKbzPayInstalled } from '@phonehtut/react-native-kbz-pay';
+```tsx
+import React from 'react';
+import { View, Button, Alert } from 'react-native';
+import { useKbzPay, validateOrderInfo } from '@phonehtut/react-native-kbz-pay';
 
-// Check if UAT Sandbox app is installed
-const hasUatApp = await isKbzPayInstalled('uat');
+export default function CheckoutScreen() {
+  const { pay, isPaying, isVerifying, isInstalled, openStore } = useKbzPay({
+    // Optional: Authoritative backend status verification
+    verifyPayment: async ({ merchOrderId }) => {
+      const res = await fetch(`https://your-api.com/api/payment/verify?orderId=${merchOrderId}`);
+      const data = await res.json();
+      return data.status === 'PAID';
+    },
+    onSuccess: (result) => {
+      Alert.alert('Success', `Payment confirmed! Order ID: ${result.orderId}`);
+    },
+    onCancelled: () => {
+      Alert.alert('Cancelled', 'You cancelled the KBZ Pay transaction.');
+    },
+    onError: (err) => {
+      Alert.alert('Payment Error', err.message);
+    },
+  });
 
-// Check if Live Production app is installed
-const hasProdApp = await isKbzPayInstalled('prod');
+  const handleCheckout = async () => {
+    // 1. Fetch prepay parameters from your backend
+    const { orderInfo, sign } = await fetchPrepayFromBackend();
 
-// Check if either is installed (default)
-const hasAnyApp = await isKbzPayInstalled('any');
+    // 2. (Optional) Validate parameters before launching
+    const validation = validateOrderInfo(orderInfo);
+    if (!validation.isValid) {
+      console.warn('Malformed orderInfo:', validation.errors);
+      return;
+    }
 
-if (!hasAnyApp) {
-  // Show prompt to install KBZ Pay or provide web fallback
+    // 3. Launch payment
+    await pay({ orderInfo, sign });
+  };
+
+  if (isInstalled === false) {
+    return (
+      <View>
+        <Button title="Install KBZ Pay" onPress={() => openStore('prod')} />
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      <Button
+        title={isVerifying ? "Verifying..." : isPaying ? "Processing..." : "Pay with KBZ Pay"}
+        disabled={isPaying || isVerifying}
+        onPress={handleCheckout}
+      />
+    </View>
+  );
 }
 ```
 
-### 2. Start Payment (with Backend Verification)
+---
 
-In mobile payments, relying purely on native deep links/activity callbacks can fail if the user switches apps manually or if the OS terminates the activity.
+### 2. Imperative Usage (`startKbzPay`)
 
-You can supply the `verifyPayment` callback in `startKbzPay`. When the user returns to your app (`AppState` becomes `active`), the package automatically polls your backend to verify that the transaction was confirmed via KBZ Pay's server webhook:
+You can also use the promise-based `startKbzPay` function directly:
 
 ```typescript
-import { startKbzPay, type KbzPayResult } from '@phonehtut/react-native-kbz-pay';
+import {
+  startKbzPay,
+  isKbzPayInstalled,
+  openKbzPayStore,
+  type KbzPayResult,
+} from '@phonehtut/react-native-kbz-pay';
+
+// Check if app is installed
+const hasKbzPay = await isKbzPayInstalled('any');
+if (!hasKbzPay) {
+  await openKbzPayStore('prod'); // Redirect to App Store / Google Play
+  return;
+}
 
 try {
-  // 1. Get prepay orderInfo and sign from your backend
-  const { orderInfo, sign, merchOrderId } = await fetchPaymentPayloadFromYourBackend();
-
-  // 2. Open KBZ Pay app with backend verification
   const result: KbzPayResult = await startKbzPay({
-    orderInfo,
-    sign,
+    orderInfo: 'appid=...&merch_code=...&nonce_str=...&prepay_id=...&timestamp=...',
+    sign: 'YOUR_SHA256_SIGNATURE',
     signType: 'SHA256',
-    merchOrderId,
-
-    // Authoritative Backend Verification Callback
     verifyPayment: async ({ merchOrderId }) => {
-      const response = await fetch(`https://your-api.com/api/payment/status?orderId=${merchOrderId}`);
-      const data = await response.json();
-
-      // Return:
-      // - 'completed' or true  => Payment confirmed
-      // - 'failed' or false     => Payment failed
-      // - 'pending'             => Still processing (will retry up to maxPollingAttempts)
-      if (data.status === 'PAID') return 'completed';
-      if (data.status === 'FAILED') return 'failed';
-      return 'pending';
+      const res = await checkBackendStatus(merchOrderId);
+      return res.isPaid;
     },
-
-    pollingIntervalMs: 2000, // Poll backend every 2s (default: 2000)
-    maxPollingAttempts: 15,  // Try up to 15 times (~30s) (default: 15)
   });
 
-  // 3. Handle confirmed result
   if (result.status === 'completed') {
-    console.log('Payment confirmed by backend! Order ID:', result.orderId);
+    console.log('Payment successful! Order ID:', result.orderId);
   } else if (result.status === 'cancelled') {
-    console.log('User cancelled the payment.');
+    console.log('Payment cancelled by user.');
   } else {
     console.error('Payment failed:', result.failMessage);
   }
 } catch (error) {
-  console.error('Error during KBZ Pay checkout:', error);
+  console.error('Payment flow error:', error);
 }
 ```
 
-### 3. Event Listener (Optional)
+---
+
+### 3. Utility Helpers
+
+#### Check & Open Store
+```typescript
+import { isKbzPayInstalled, openKbzPayStore } from '@phonehtut/react-native-kbz-pay';
+
+const installed = await isKbzPayInstalled('any'); // 'prod' | 'uat' | 'any'
+if (!installed) {
+  await openKbzPayStore('prod'); // Opens Play Store on Android or App Store on iOS
+}
+```
+
+#### Validate & Build Order Info
+```typescript
+import { validateOrderInfo, buildOrderInfo } from '@phonehtut/react-native-kbz-pay';
+
+// Validate orderInfo query string
+const check = validateOrderInfo(orderInfo);
+if (!check.isValid) {
+  console.error('Missing fields:', check.missingParams);
+}
+
+// Build ASCII sorted query string
+const queryString = buildOrderInfo({
+  appid: 'kp123',
+  merch_code: '1001',
+  nonce_str: 'xyz',
+  prepay_id: 'KBZ01',
+  timestamp: '1700000000',
+});
+```
+
+---
+
+### 4. Event Listener (Optional)
 
 You can also listen to payment events via event emitter:
 
@@ -231,8 +302,8 @@ KBZ Pay mobile payment flow follows a standard 3-step process:
 ```
 [Mobile App] ------------ 1. Request Order ------------> [Your Backend]
                                                                 |
-                                                      2. Call KBZ Prepay API
-                                                      (/payment/gateway/prepay)
+                                                      2. Call KBZ Precreate API
+                                                      (/payment/gateway/precreate)
                                                                 |
 [Mobile App] <--- 3. Return { orderInfo, sign } <------- [Your Backend]
      |
@@ -247,11 +318,14 @@ KBZ Pay mobile payment flow follows a standard 3-step process:
 
 ### KBZ Pay Gateway Endpoints
 
+Exported as `KBZ_PAY_GATEWAY_URLS` in TypeScript for easy reference:
+
 | API | UAT Sandbox URL | Production URL |
 |-----|-----------------|----------------|
-| **Prepay (Create Order)** | `http://api.kbzpay.com/payment/gateway/uat/prepay` | `https://api.kbzpay.com/payment/gateway/prepay` |
-| **Query Order Status** | `http://api.kbzpay.com/payment/gateway/uat/queryorder` | `https://api.kbzpay.com/payment/gateway/queryorder` |
-| **Refund** | `http://api.kbzpay.com/payment/gateway/uat/refund` | `https://api.kbzpay.com/payment/gateway/refund` |
+| **Precreate (Create Order)** | `http://api-uat.kbzpay.com/payment/gateway/uat/precreate` | `https://api.kbzpay.com/payment/gateway/precreate` |
+| **Query Order Status** | `http://api-uat.kbzpay.com/payment/gateway/uat/queryorder` | `https://api.kbzpay.com/payment/gateway/queryorder` |
+| **Refund** | `http://api-uat.kbzpay.com/payment/gateway/uat/refund` | `https://api.kbzpay.com/payment/gateway/refund` |
+| **Close Order** | `http://api-uat.kbzpay.com/payment/gateway/uat/closeorder` | `https://api.kbzpay.com/payment/gateway/closeorder` |
 
 ---
 
@@ -417,6 +491,21 @@ func CreateOrderPayload(prepayID, orderID, appID, merchCode, merchKey, nonceStr 
 
 ## 📖 API Reference
 
+### `useKbzPay(options?: UseKbzPayOptions): UseKbzPayReturn`
+Modern React Hook managing payment status, background verification, and store redirects.
+
+| Return Property | Type | Description |
+|-----------------|------|-------------|
+| `pay` | `(options) => Promise<KbzPayResult>` | Launch KBZ Pay payment flow |
+| `isPaying` | `boolean` | True while payment is active in KBZ Pay app |
+| `isVerifying` | `boolean` | True while verifying authoritative status with backend |
+| `isInstalled` | `boolean \| null` | True if KBZ Pay app is installed on device |
+| `result` | `KbzPayResult \| null` | Latest transaction result |
+| `error` | `KbzPayError \| Error \| null` | Latest error encountered |
+| `openStore` | `(target?) => Promise<void>` | Redirect user to download KBZ Pay from App Store / Play Store |
+| `checkInstalled` | `(target?) => Promise<boolean>` | Re-checks if KBZ Pay app is installed |
+| `resetState` | `() => void` | Clears current state (result and error) |
+
 ### `startKbzPay(options: StartKbzPayOptions): Promise<KbzPayResult>`
 Initiates the KBZ Pay payment flow by opening the KBZ Pay app.
 
@@ -432,6 +521,15 @@ Initiates the KBZ Pay payment flow by opening the KBZ Pay app.
 | `appScheme` | `string` | No | (iOS only) Return URL scheme. Auto-detected from `CFBundleURLTypes` if omitted. |
 | `timeoutMs` | `number` | No | Callback timeout in milliseconds. Defaults to `120000` (2 minutes). |
 
+### `validateOrderInfo(orderInfo: string): KbzPayValidationResult`
+Validates that required parameters (`appid`, `merch_code`, `nonce_str`, `prepay_id`, `timestamp`) exist in the query string and alerts on potential format issues.
+
+### `buildOrderInfo(params: Record<string, any>): string`
+Helper that takes an object and converts it to an ASCII-alphabetically-sorted query string compatible with KBZ Pay API requirements.
+
+### `openKbzPayStore(target?: 'prod' | 'uat'): Promise<void>`
+Opens Google Play Store or Apple App Store directly to the KBZ Pay download page.
+
 ### `pollPaymentStatus(options): Promise<KbzPayResult>`
 Standalone helper function to poll any payment verification endpoint until success or timeout.
 
@@ -443,6 +541,18 @@ Standalone helper function to poll any payment verification endpoint until succe
 | `code` | `number` | Raw SDK return code (`0`: Completed, `3`: Cancelled, `-1`: Failed) |
 | `orderId` | `string \| undefined` | Order ID returned from transaction |
 | `failMessage` | `string \| undefined` | Error message if payment failed |
+| `errorCode` | `KbzPayErrorCode \| undefined` | Standardized error code |
+
+### Error Codes: `KbzPayErrorCode`
+- `APP_NOT_INSTALLED`: KBZ Pay app is not installed on device
+- `USER_CANCELLED`: User cancelled the transaction inside KBZ Pay
+- `PAYMENT_FAILED`: Payment transaction failed
+- `PAYMENT_TIMEOUT`: Timed out waiting for completion or backend verification
+- `ALREADY_IN_PROGRESS`: A transaction is currently already underway
+- `INVALID_ORDER_INFO`: `orderInfo` parameter was invalid or empty
+- `INVALID_SIGNATURE`: `sign` parameter was invalid or empty
+- `ACTIVITY_UNAVAILABLE`: Android activity or iOS root controller is not currently active
+- `UNSUPPORTED_PLATFORM`: Attempted to run on Web or unsupported platform
 
 ### `isKbzPayInstalled(target?: 'prod' | 'uat' | 'any'): Promise<boolean>`
 Checks whether the KBZ Pay application is installed on the user's device.
@@ -469,7 +579,10 @@ Ensure your iOS app has registered a custom URL scheme in `CFBundleURLTypes` (e.
 ### 3. "Android 11+ shows app not installed even though it is"
 This package automatically bundles `<queries>` for both `com.kbzbank.kpaycustomer` (PROD) and `com.kbzbank.kpaycustomer.uat` (UAT). No manual changes to your `AndroidManifest.xml` are needed.
 
-### 4. "Should I trust client-side status for delivering goods/services?"
+### 4. "Android payment screen opens and closes immediately or shows error"
+Make sure your Android APK signing keystore's **SHA-256 fingerprint** matches the fingerprint registered with the KBZ Pay Merchant Portal. If the keystore signature does not match your registered `appid`, KBZ Pay's native SDK will automatically reject the payment request.
+
+### 5. "Should I trust client-side status for delivering goods/services?"
 **NO**. Always verify the transaction with your backend server using KBZ Pay's server-to-server callback notification (webhook) or query order API before fulfilling paid services.
 
 ---

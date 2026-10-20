@@ -7,16 +7,20 @@ import {
   Linking,
   type EmitterSubscription,
 } from 'react-native';
-import type {
-  KbzEnvironment,
-  KbzPayResult,
-  KbzPayStatus,
-  KbzVerificationStatus,
-  StartKbzPayOptions,
-  VerifyPaymentContext,
+import {
+  type KbzEnvironment,
+  KbzPayError,
+  KbzPayErrorCode,
+  type KbzPayResult,
+  type KbzPayStatus,
+  type KbzVerificationStatus,
+  type StartKbzPayOptions,
+  type VerifyPaymentContext,
 } from './types';
 
 export * from './types';
+export * from './utils';
+export * from './useKbzPay';
 
 interface NativeRawResult {
   result: number;
@@ -69,18 +73,28 @@ function toStatus(resultCode: number): KbzPayStatus {
   return 'failed';
 }
 
+function toErrorCode(resultCode: number): KbzPayErrorCode | undefined {
+  if (resultCode === 3) return KbzPayErrorCode.USER_CANCELLED;
+  if (resultCode !== 0) return KbzPayErrorCode.PAYMENT_FAILED;
+  return undefined;
+}
+
 function normalizeResult(raw: NativeRawResult): KbzPayResult {
   return {
     code: raw.result,
     status: toStatus(raw.result),
+    errorCode: toErrorCode(raw.result),
     orderId: raw.orderId ?? undefined,
     failMessage: raw.failMessage ?? undefined,
   };
 }
 
-function extractMerchOrderId(orderInfo?: string): string | undefined {
+/**
+ * Extracts merch_order_id from an orderInfo string or JSON payload.
+ */
+export function extractMerchOrderId(orderInfo?: string): string | undefined {
   if (!orderInfo) return undefined;
-  const match = orderInfo.match(/[?&]merch_order_id=([^&#]+)/i);
+  const match = orderInfo.match(/(?:^|[?&])merch_order_id=([^&#]+)/i);
   if (match) {
     try {
       return decodeURIComponent(match[1].trim());
@@ -179,11 +193,12 @@ export function parseKbzUrl(urlString: string): KbzPayResult | null {
       return {
         code,
         status: toStatus(code),
+        errorCode: toErrorCode(code),
         orderId,
         failMessage,
       };
     }
-  } catch (error) {
+  } catch {
     // Malformed url
   }
   return null;
@@ -222,6 +237,7 @@ export async function pollPaymentStatus(options: {
         return {
           code: -1,
           status: 'failed',
+          errorCode: KbzPayErrorCode.PAYMENT_FAILED,
           failMessage: 'Payment marked as failed by backend verification.',
           orderId: context.merchOrderId || context.orderId,
         };
@@ -238,9 +254,28 @@ export async function pollPaymentStatus(options: {
   return {
     code: -1,
     status: 'failed',
+    errorCode: KbzPayErrorCode.PAYMENT_TIMEOUT,
     failMessage: 'Payment status verification timed out while querying backend.',
     orderId: context.merchOrderId || context.orderId,
   };
+}
+
+function mapNativeError(err: any): KbzPayError {
+  const code = err?.code || '';
+  const message = err?.message || 'Native KBZ Pay call failed.';
+  if (code === 'E_IN_PROGRESS') {
+    return new KbzPayError(message, KbzPayErrorCode.ALREADY_IN_PROGRESS, { cause: err });
+  }
+  if (code === 'E_NO_ACTIVITY') {
+    return new KbzPayError(message, KbzPayErrorCode.ACTIVITY_UNAVAILABLE, { cause: err });
+  }
+  if (code === 'E_INVALID_ORDER_INFO') {
+    return new KbzPayError(message, KbzPayErrorCode.INVALID_ORDER_INFO, { cause: err });
+  }
+  if (code === 'E_INVALID_SIGN') {
+    return new KbzPayError(message, KbzPayErrorCode.INVALID_SIGNATURE, { cause: err });
+  }
+  return new KbzPayError(message, KbzPayErrorCode.UNKNOWN, { cause: err });
 }
 
 /**
@@ -265,7 +300,10 @@ export async function pollPaymentStatus(options: {
  */
 export async function startKbzPay(options: StartKbzPayOptions): Promise<KbzPayResult> {
   if (Platform.OS !== 'android' && Platform.OS !== 'ios') {
-    throw new Error(`KBZ Pay is not supported on platform: ${Platform.OS}`);
+    throw new KbzPayError(
+      `KBZ Pay is not supported on platform: ${Platform.OS}`,
+      KbzPayErrorCode.UNSUPPORTED_PLATFORM
+    );
   }
 
   const {
@@ -280,12 +318,18 @@ export async function startKbzPay(options: StartKbzPayOptions): Promise<KbzPayRe
     timeoutMs = DEFAULT_TIMEOUT_MS,
   } = options;
 
-  if (!orderInfo || typeof orderInfo !== 'string') {
-    throw new Error('orderInfo is required and must be a valid string.');
+  if (!orderInfo || typeof orderInfo !== 'string' || orderInfo.trim().length === 0) {
+    throw new KbzPayError(
+      'orderInfo is required and must be a valid non-empty string.',
+      KbzPayErrorCode.INVALID_ORDER_INFO
+    );
   }
 
-  if (!sign || typeof sign !== 'string') {
-    throw new Error('sign is required and must be a valid string.');
+  if (!sign || typeof sign !== 'string' || sign.trim().length === 0) {
+    throw new KbzPayError(
+      'sign is required and must be a valid non-empty string.',
+      KbzPayErrorCode.INVALID_SIGNATURE
+    );
   }
 
   // Strip duplicate sign in orderInfo if already included to prevent duplicate params
@@ -333,7 +377,7 @@ export async function startKbzPay(options: StartKbzPayOptions): Promise<KbzPayRe
       resolve(result);
     };
 
-    const settleReject = (error: Error) => {
+    const settleReject = (error: Error | KbzPayError) => {
       if (isSettled) return;
       isSettled = true;
       cleanup();
@@ -367,6 +411,7 @@ export async function startKbzPay(options: StartKbzPayOptions): Promise<KbzPayRe
           settleResolve({
             code: -1,
             status: 'failed',
+            errorCode: KbzPayErrorCode.PAYMENT_FAILED,
             failMessage: err?.message || 'Error occurred while verifying payment with backend.',
             orderId: resolvedOrderId,
           });
@@ -380,8 +425,10 @@ export async function startKbzPay(options: StartKbzPayOptions): Promise<KbzPayRe
     overallTimeoutTimer = setTimeout(() => {
       resetKbzPayState().catch(() => {});
       settleReject(
-        new Error(
-          'KBZ Pay payment timed out. The user may have abandoned the transaction or closed the app.'
+        new KbzPayError(
+          'KBZ Pay payment timed out. The user may have abandoned the transaction or closed the app.',
+          KbzPayErrorCode.PAYMENT_TIMEOUT,
+          { orderId: resolvedOrderId }
         )
       );
     }, timeoutMs);
@@ -390,7 +437,6 @@ export async function startKbzPay(options: StartKbzPayOptions): Promise<KbzPayRe
     if (eventEmitter) {
       eventSubscription = eventEmitter.addListener('KBZPayResult', (payload: any) => {
         const normalized = normalizeResult(payload as NativeRawResult);
-        // If developer provided verifyPayment and result was completed or unclear, confirm with backend
         if (verifyPayment) {
           triggerBackendVerification(normalized.code);
         } else {
@@ -418,8 +464,7 @@ export async function startKbzPay(options: StartKbzPayOptions): Promise<KbzPayRe
     appStateSubscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       if (isSettled) return;
       if (nextState === 'active') {
-        // First check if an initial deep link arrived upon resuming
-        Linking.getInitialURL().then((url) => {
+        Linking.getInitialURL().then((url: string | null | undefined) => {
           if (isSettled) return;
           if (url) {
             const parsed = parseKbzUrl(url);
@@ -433,7 +478,6 @@ export async function startKbzPay(options: StartKbzPayOptions): Promise<KbzPayRe
             }
           }
 
-          // If verifyPayment is provided, poll backend as the authoritative source
           if (verifyPayment) {
             if (pollTimer) clearTimeout(pollTimer);
             pollTimer = setTimeout(() => {
@@ -458,11 +502,10 @@ export async function startKbzPay(options: StartKbzPayOptions): Promise<KbzPayRe
       NativeKbzPayModule.startPay(cleanOrderInfo, sign, signType)
         .then(onNativeDone)
         .catch((err) => {
-          // If native threw, but verifyPayment is present, give backend a chance to verify
           if (verifyPayment) {
             triggerBackendVerification(-1);
           } else {
-            settleReject(err);
+            settleReject(mapNativeError(err));
           }
         });
     } else {
@@ -472,7 +515,7 @@ export async function startKbzPay(options: StartKbzPayOptions): Promise<KbzPayRe
           if (verifyPayment) {
             triggerBackendVerification(-1);
           } else {
-            settleReject(err);
+            settleReject(mapNativeError(err));
           }
         });
     }

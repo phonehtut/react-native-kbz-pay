@@ -1,6 +1,6 @@
 {
   "name": "@phonehtut/react-native-kbz-pay",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "Developer-friendly KBZ Pay mobile payment integration for React Native and Expo (iOS & Android)",
   "main": "lib/commonjs/index.js",
   "module": "lib/module/index.js",
@@ -34,8 +34,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.build.esm.json",
     "clean": "rm -rf lib",
+    "test": "jest",
     "prepare": "npm run build",
-    "prepublishOnly": "npm run clean && npm run build"
+    "prepublishOnly": "npm run clean && npm run build && npm test"
   },
   "publishConfig": {
     "access": "public"
@@ -62,9 +63,12 @@
   },
   "devDependencies": {
     "@expo/config-plugins": "^9.0.0",
+    "@types/jest": "^30.0.0",
     "@types/react": "^19.0.0",
+    "jest": "^30.5.2",
     "react": "19.3.0",
     "react-native": "0.88.0",
+    "ts-jest": "^29.4.15",
     "typescript": "^5.3.3"
   }
 }

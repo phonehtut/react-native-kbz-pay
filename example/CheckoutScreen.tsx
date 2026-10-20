@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -7,109 +7,74 @@ import {
   Alert,
   StyleSheet,
   SafeAreaView,
-  Linking,
-  Platform,
 } from 'react-native';
 import {
-  startKbzPay,
-  isKbzPayInstalled,
+  useKbzPay,
+  validateOrderInfo,
   type KbzPayResult,
 } from '@phonehtut/react-native-kbz-pay';
 
 export default function CheckoutScreen() {
-  const [isAppInstalled, setIsAppInstalled] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Check if KBZ Pay is installed on the user's device
-    checkApp();
-  }, []);
-
-  const checkApp = async () => {
-    // Check if either UAT or Production app is installed
-    // You can also pass 'uat' to check UAT Sandbox only, or 'prod' for Production only
-    const installed = await isKbzPayInstalled('any');
-    setIsAppInstalled(installed);
-  };
-
-  const openAppStore = () => {
-    if (Platform.OS === 'ios') {
-      Linking.openURL('https://apps.apple.com/mm/app/kbzpay-customer/id1439265902');
-    } else {
-      Linking.openURL('https://play.google.com/store/apps/details?id=com.kbzbank.kpaycustomer');
-    }
-  };
+  // Use the modern, ergonomic React hook
+  const {
+    pay,
+    isPaying,
+    isVerifying,
+    isInstalled,
+    result,
+    openStore,
+  } = useKbzPay({
+    // Optional: Backend verification callback to confirm authoritative transaction status
+    verifyPayment: async ({ merchOrderId }) => {
+      // Example: Query your backend server to confirm status
+      /*
+      const res = await fetch(`https://your-api.com/api/payment/verify?orderId=${merchOrderId}`);
+      const json = await res.json();
+      if (json.status === 'PAID') return 'completed';
+      if (json.status === 'FAILED') return 'failed';
+      return 'pending';
+      */
+      return 'completed';
+    },
+    onSuccess: (res: KbzPayResult) => {
+      Alert.alert('Payment Successful!', `Transaction completed.\nOrder ID: ${res.orderId ?? 'N/A'}`);
+    },
+    onCancelled: () => {
+      Alert.alert('Cancelled', 'You cancelled the KBZ Pay transaction.');
+    },
+    onError: (err) => {
+      Alert.alert('Payment Error', err.message);
+    },
+  });
 
   const handlePay = async () => {
-    try {
-      setLoading(true);
-      setPaymentStatus(null);
+    // Sample prepay payload returned from your backend prepay API
+    const sampleBackendResponse = {
+      orderInfo:
+        'appid=kp1234567890abcdef&merch_code=100001&nonce_str=5K8264ILTKCH16CQ2502SI8ZNMTM67VS&prepay_id=KBZ001234567890&timestamp=1700000000&merch_order_id=ORDER_1024',
+      sign: 'B18C06DC1C0E473F470EBF89A6B971B7C9BCE2B1A6E7D2E240FEA9292CEBEB42',
+      signType: 'SHA256',
+    };
 
-      // 1. Fetch prepay order parameters from YOUR backend server
-      // (Your backend calls KBZ Pay Prepay API, generates orderInfo and SHA256 sign)
-      /*
-      const response = await fetch('https://your-api.com/api/payment/kbz/prepay', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: 50000,
-          currency: 'MMK',
-          orderTitle: 'Hotel Booking #1024',
-        }),
-      });
-      const data = await response.json();
-      */
-
-      // Sample payload returned from backend:
-      const sampleBackendResponse = {
-        orderInfo: 'appid=kp1234567890abcdef&merch_code=100001&nonce_str=5K8264ILTKCH16CQ2502SI8ZNMTM67VS&prepay_id=KBZ001234567890&timestamp=1700000000',
-        sign: 'B18C06DC1C0E473F470EBF89A6B971B7C9BCE2B1A6E7D2E240FEA9292CEBEB42',
-        signType: 'SHA256',
-      };
-
-      // 2. Call startKbzPay with backend payload and optional verifyPayment callback
-      const result: KbzPayResult = await startKbzPay({
-        orderInfo: sampleBackendResponse.orderInfo,
-        sign: sampleBackendResponse.sign,
-        signType: sampleBackendResponse.signType,
-        // Optional: Provide backend transaction verification callback
-        // When user returns from KBZ Pay app (AppState active), this callback is
-        // called to verify with your backend that the payment was truly confirmed.
-        verifyPayment: async ({ merchOrderId }) => {
-          /*
-          const res = await fetch(`https://your-api.com/api/payment/verify?orderId=${merchOrderId}`);
-          const json = await res.json();
-          // Return 'completed' | 'failed' | 'pending' (to retry)
-          if (json.status === 'PAID') return 'completed';
-          if (json.status === 'FAILED') return 'failed';
-          return 'pending';
-          */
-          return 'completed';
-        },
-        // Optional iOS return scheme:
-        // appScheme: 'myhotelapp',
-      });
-
-      // 3. Handle the result
-      if (result.status === 'completed') {
-        setPaymentStatus('Payment completed successfully!');
-        Alert.alert('Success', `KBZ Pay payment successful!\nOrder ID: ${result.orderId ?? 'N/A'}`);
-
-        // Notify your backend to verify transaction status (recommended)
-        // await verifyOnBackend(result.orderId);
-      } else if (result.status === 'cancelled') {
-        setPaymentStatus('Payment was cancelled by user.');
-        Alert.alert('Cancelled', 'You cancelled the KBZ Pay transaction.');
-      } else {
-        setPaymentStatus(`Payment failed: ${result.failMessage ?? 'Unknown error'}`);
-        Alert.alert('Failed', result.failMessage ?? 'Payment transaction failed.');
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to start KBZ Pay.');
-    } finally {
-      setLoading(false);
+    // Optional: Validate payload before launching
+    const validation = validateOrderInfo(sampleBackendResponse.orderInfo);
+    if (!validation.isValid) {
+      Alert.alert('Validation Error', validation.errors.join('\n'));
+      return;
     }
+
+    // Launch payment
+    await pay({
+      orderInfo: sampleBackendResponse.orderInfo,
+      sign: sampleBackendResponse.sign,
+      signType: sampleBackendResponse.signType,
+    });
+  };
+
+  const getButtonText = () => {
+    if (isVerifying) return 'Verifying with Backend...';
+    if (isPaying) return 'Processing Payment...';
+    return 'Pay with KBZ Pay';
   };
 
   return (
@@ -123,38 +88,44 @@ export default function CheckoutScreen() {
           <Text
             style={[
               styles.statusValue,
-              { color: isAppInstalled ? '#16a34a' : '#dc2626' },
+              { color: isInstalled ? '#16a34a' : '#dc2626' },
             ]}
           >
-            {isAppInstalled === null
+            {isInstalled === null
               ? 'Checking...'
-              : isAppInstalled
+              : isInstalled
               ? 'Yes'
               : 'No (Install required)'}
           </Text>
         </View>
 
-        {!isAppInstalled && isAppInstalled !== null && (
-          <TouchableOpacity style={styles.installButton} onPress={openAppStore}>
+        {isInstalled === false && (
+          <TouchableOpacity style={styles.installButton} onPress={() => openStore('prod')}>
             <Text style={styles.installButtonText}>Download KBZ Pay App</Text>
           </TouchableOpacity>
         )}
 
         <TouchableOpacity
-          style={[styles.payButton, loading && styles.disabledButton]}
-          disabled={loading}
+          style={[styles.payButton, (isPaying || isVerifying) && styles.disabledButton]}
+          disabled={isPaying || isVerifying}
           onPress={handlePay}
         >
-          {loading ? (
+          {isPaying || isVerifying ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.payButtonText}>Pay with KBZ Pay</Text>
+            <Text style={styles.payButtonText}>{getButtonText()}</Text>
           )}
         </TouchableOpacity>
 
-        {paymentStatus && (
+        {result && (
           <View style={styles.resultBox}>
-            <Text style={styles.resultText}>{paymentStatus}</Text>
+            <Text style={styles.resultStatus}>
+              Status: <Text style={{ fontWeight: '700' }}>{result.status.toUpperCase()}</Text>
+            </Text>
+            {result.orderId && <Text style={styles.resultText}>Order ID: {result.orderId}</Text>}
+            {result.failMessage && (
+              <Text style={styles.resultError}>Error: {result.failMessage}</Text>
+            )}
           </View>
         )}
       </View>
@@ -245,9 +216,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#f1f5f9',
     borderRadius: 8,
   },
+  resultStatus: {
+    fontSize: 14,
+    color: '#0f172a',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
   resultText: {
     fontSize: 13,
     color: '#334155',
     textAlign: 'center',
+  },
+  resultError: {
+    fontSize: 13,
+    color: '#dc2626',
+    textAlign: 'center',
+    marginTop: 4,
   },
 });

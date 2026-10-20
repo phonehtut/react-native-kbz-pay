@@ -4,6 +4,47 @@ export type KbzEnvironment = 'prod' | 'uat' | 'any';
 
 export type KbzVerificationStatus = boolean | 'completed' | 'failed' | 'pending';
 
+/**
+ * Standardized Error Codes for KBZ Pay operations.
+ */
+export enum KbzPayErrorCode {
+  APP_NOT_INSTALLED = 'APP_NOT_INSTALLED',
+  USER_CANCELLED = 'USER_CANCELLED',
+  PAYMENT_FAILED = 'PAYMENT_FAILED',
+  PAYMENT_TIMEOUT = 'PAYMENT_TIMEOUT',
+  ALREADY_IN_PROGRESS = 'ALREADY_IN_PROGRESS',
+  INVALID_ORDER_INFO = 'INVALID_ORDER_INFO',
+  INVALID_SIGNATURE = 'INVALID_SIGNATURE',
+  ACTIVITY_UNAVAILABLE = 'ACTIVITY_UNAVAILABLE',
+  UNSUPPORTED_PLATFORM = 'UNSUPPORTED_PLATFORM',
+  STORE_REDIRECT_FAILED = 'STORE_REDIRECT_FAILED',
+  UNKNOWN = 'UNKNOWN',
+}
+
+/**
+ * Strongly-typed Error class for KBZ Pay operations.
+ */
+export class KbzPayError extends Error {
+  readonly code: KbzPayErrorCode;
+  readonly nativeCode?: number;
+  readonly orderId?: string;
+
+  constructor(
+    message: string,
+    code: KbzPayErrorCode = KbzPayErrorCode.UNKNOWN,
+    options?: { nativeCode?: number; orderId?: string; cause?: unknown }
+  ) {
+    super(message);
+    this.name = 'KbzPayError';
+    this.code = code;
+    this.nativeCode = options?.nativeCode;
+    this.orderId = options?.orderId;
+    if (options?.cause) {
+      (this as any).cause = options.cause;
+    }
+  }
+}
+
 export interface KbzPayResult {
   /**
    * Numeric return code from KBZ Pay SDK.
@@ -24,6 +65,10 @@ export interface KbzPayResult {
    * Error or failure message if the payment failed or was cancelled.
    */
   failMessage?: string;
+  /**
+   * Standardized error code if failed or cancelled.
+   */
+  errorCode?: KbzPayErrorCode;
 }
 
 export interface VerifyPaymentContext {
@@ -87,4 +132,100 @@ export interface StartKbzPayOptions {
    * Maximum polling attempts for backend confirmation (default: 15 attempts).
    */
   maxPollingAttempts?: number;
+}
+
+export interface KbzPayValidationResult {
+  isValid: boolean;
+  missingParams: string[];
+  errors: string[];
+  params: Record<string, string>;
+}
+
+export interface UseKbzPayOptions {
+  /**
+   * Optional default custom URL Scheme for iOS.
+   */
+  appScheme?: string;
+
+  /**
+   * Optional default timeout in ms (default: 120000ms).
+   */
+  timeoutMs?: number;
+
+  /**
+   * Optional backend verification callback.
+   */
+  verifyPayment?: (context: VerifyPaymentContext) => Promise<KbzVerificationStatus>;
+
+  /**
+   * Polling interval in ms (default: 2000ms).
+   */
+  pollingIntervalMs?: number;
+
+  /**
+   * Maximum polling attempts (default: 15).
+   */
+  maxPollingAttempts?: number;
+
+  /**
+   * Optional callback when payment completes successfully.
+   */
+  onSuccess?: (result: KbzPayResult) => void;
+
+  /**
+   * Optional callback when payment is cancelled by the user.
+   */
+  onCancelled?: (result: KbzPayResult) => void;
+
+  /**
+   * Optional callback when payment fails or throws an error.
+   */
+  onError?: (error: KbzPayError | Error) => void;
+}
+
+export interface UseKbzPayReturn {
+  /**
+   * Start the KBZ Pay payment flow.
+   */
+  pay: (options: StartKbzPayOptions) => Promise<KbzPayResult>;
+
+  /**
+   * True while user is in KBZ Pay app completing the transaction.
+   */
+  isPaying: boolean;
+
+  /**
+   * True while querying your backend server for payment status confirmation.
+   */
+  isVerifying: boolean;
+
+  /**
+   * Most recent payment result, or null.
+   */
+  result: KbzPayResult | null;
+
+  /**
+   * Most recent error encountered, or null.
+   */
+  error: KbzPayError | Error | null;
+
+  /**
+   * Null during initial check, boolean once check completes.
+   */
+  isInstalled: boolean | null;
+
+  /**
+   * Re-check if KBZ Pay app is installed.
+   */
+  checkInstalled: (target?: KbzEnvironment) => Promise<boolean>;
+
+  /**
+   * Redirect user to Google Play Store or Apple App Store to install KBZ Pay.
+   */
+  openStore: (target?: KbzEnvironment) => Promise<void>;
+
+  /**
+   * Reset hook state (clears result and error).
+   */
+  resetState: () => void;
 }

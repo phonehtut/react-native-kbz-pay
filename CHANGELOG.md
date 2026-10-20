@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [1.1.0] - 2026-10-20
+
+### 🚀 Added
+- **`useKbzPay` Custom Hook**: Modern React hook for state management (`isPaying`, `isVerifying`, `isInstalled`, `result`, `error`), automatic verification handling, and callbacks (`onSuccess`, `onCancelled`, `onError`).
+- **`openKbzPayStore(target)`**: Utility to redirect users directly to Google Play Store or Apple App Store if KBZ Pay app is not installed.
+- **`validateOrderInfo(orderInfo)`**: Parameter validation helper to inspect prepay query strings and report missing or malformed params before launching payment.
+- **`buildOrderInfo(params)`**: Query string builder that formats parameters in ASCII-sorted order compliant with KBZ Pay SDK requirements.
+- **Typed Error Handling**:
+  - `KbzPayError` class with error codes and causes.
+  - `KbzPayErrorCode` enum (`APP_NOT_INSTALLED`, `USER_CANCELLED`, `PAYMENT_FAILED`, `PAYMENT_TIMEOUT`, `ALREADY_IN_PROGRESS`, etc.).
+- **Jest Unit Test Suite**: Comprehensive tests covering utilities, order parsing/validation, URL parsing, and payment polling with 100% pass rate.
+- **Enhanced Documentation & Examples**: Updated `example/CheckoutScreen.tsx` with modern hook patterns, added Keystore SHA-256 fingerprint troubleshooting guide in `README.md`.
+
+---
+
 ## [1.0.0] - 2026-10-20
 
 ### 🚀 Initial Release
